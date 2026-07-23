@@ -1,0 +1,1 @@
+import{NextResponse}from"next/server";import{env}from"@/lib/env";export async function POST(){const r=NextResponse.json({success:true});r.cookies.set(env.authCookieName,"",{httpOnly:true,secure:env.authCookieSecure,sameSite:"lax",path:"/",maxAge:0});return r}

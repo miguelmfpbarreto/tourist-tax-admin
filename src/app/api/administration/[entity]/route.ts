@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { apiRequest, ApiRequestError } from "@/lib/api";
+import { getToken } from "@/lib/session";
+const allowed=new Set(["users","profiles","permissions"]);
+export async function GET(request:Request,{params}:{params:Promise<{entity:string}>}){try{const token=await getToken();const {entity}=await params;if(!token)return NextResponse.json({success:false,message:"Sessão expirada."},{status:401});if(!allowed.has(entity))return NextResponse.json({success:false,message:"Entidade inválida."},{status:404});const q=new URL(request.url).searchParams.toString();const data=await apiRequest(`/admin/${entity}${q?`?${q}`:""}`,{token});return NextResponse.json({success:true,data});}catch(e){return fail(e);}}
+export async function POST(request:Request,{params}:{params:Promise<{entity:string}>}){try{const token=await getToken();const {entity}=await params;if(!token)return NextResponse.json({success:false,message:"Sessão expirada."},{status:401});const data=await apiRequest(`/admin/${entity}`,{method:"POST",token,body:JSON.stringify(await request.json())});return NextResponse.json({success:true,data});}catch(e){return fail(e);}}
+function fail(e:unknown){if(e instanceof ApiRequestError)return NextResponse.json({success:false,message:e.message,details:e.details},{status:e.status});return NextResponse.json({success:false,message:"Erro interno no módulo de administração."},{status:500});}

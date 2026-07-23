@@ -1,0 +1,1 @@
+import "@/app/globals.css"; export const metadata={title:"Tourist Tax Admin"}; export default function Layout({children}:{children:React.ReactNode}){return <html lang="pt-PT"><body>{children}</body></html>;}

@@ -1,0 +1,2 @@
+function required(name: string): string { const value = process.env[name]; if (!value) throw new Error(`Variável em falta: ${name}`); return value; }
+export const env = { apiUrl: required("TOURIST_TAX_API_URL").replace(/\/+$/, ""), authCookieName: process.env.AUTH_COOKIE_NAME || "tourist_tax_admin_token", authCookieSecure: String(process.env.AUTH_COOKIE_SECURE || "false").toLowerCase() === "true" };

@@ -1,0 +1,3 @@
+export function money(v:string|number|null|undefined,c?:string|null){const n=Number(v||0);const s=c==="EURO"?"€":c==="DOLAR"?"$":c==="DOBRA"?"Db":"";return `${new Intl.NumberFormat("pt-PT",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)}${s?` ${s}`:""}`;}
+export function dateOnly(v?:string|null){if(!v)return"—";const p=v.substring(0,10).split("-");return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:v;}
+export function dateTime(v?:string|null){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat("pt-PT",{dateStyle:"short",timeStyle:"short"}).format(d);}

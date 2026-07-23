@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { KeyRound, ShieldCheck, Users } from "lucide-react";
+const modules=[["/administration/users","Utilizadores","Criar, editar, ativar e desativar utilizadores.",Users],["/administration/profiles","Perfis","Gerir perfis e respetivas permissões.",ShieldCheck],["/administration/permissions","Permissões","Gerir permissões disponíveis no sistema.",KeyRound]] as const;
+export default function Page(){return <main className="page"><div className="page-header"><div><h1>Administração</h1><p>Gestão de utilizadores, perfis e permissões.</p></div></div><section className="grid admin-module-grid">{modules.map(([href,title,description,Icon])=><Link key={href} href={href} className="card admin-module-card"><div className="admin-module-icon"><Icon size={24}/></div><h2>{title}</h2><p>{description}</p></Link>)}</section></main>;}

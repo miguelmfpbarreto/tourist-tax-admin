@@ -1,0 +1,2 @@
+import {redirect} from "next/navigation";import {Globe2} from "lucide-react";import {getCurrentUser} from "@/lib/session";import {LoginForm} from "@/components/LoginForm";
+export default async function Page(){if(await getCurrentUser())redirect("/dashboard");return <main className="login-page"><section className="card login-card"><div className="brand-mark"><Globe2/></div><h1>Tourist Tax Admin</h1><p className="muted">Gestão e administração central.</p><LoginForm/></section></main>}
