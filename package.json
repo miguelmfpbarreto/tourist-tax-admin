@@ -8,15 +8,17 @@
         "start": "next start -p 3001"
     },
     "dependencies": {
+        "dom-to-image-more": "^3.10.2",
+        "html-to-image": "^1.11.13",
+        "jspdf": "latest",
+        "jspdf-autotable": "latest",
         "lucide-react": "latest",
         "next": "latest",
         "react": "latest",
         "react-dom": "latest",
-        "zod": "latest",
         "recharts": "latest",
-        "jspdf": "latest",
-        "jspdf-autotable": "latest",
-        "xlsx": "latest"
+        "xlsx": "latest",
+        "zod": "latest"
     },
     "devDependencies": {
         "@types/node": "latest",

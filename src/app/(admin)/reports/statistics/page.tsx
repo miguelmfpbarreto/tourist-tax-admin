@@ -46,7 +46,7 @@ export default async function Page() {
                         </h1>
 
                         <p className="muted">
-                            Indicadores e gráficos de evolução, ligações mais utilizadas e motivos da viagem.
+                            Distribuição por nacionalidade, motivos de viagem, ligações mais utilizadas e evolução diária.
                         </p>
                     </div>
                 </div>
@@ -54,6 +54,7 @@ export default async function Page() {
                 <ReportsClient
                     initialView="summary"
                     fixedView={true}
+                    reportKind="statistics"
                     system={system}
                     user={user}
                 />

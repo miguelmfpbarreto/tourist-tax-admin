@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     ClipboardCopy,
     Download,
@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
 import { dateOnly, dateTime, money } from "@/lib/format";
 import type {
@@ -270,9 +271,12 @@ function GroupTable({
     );
 }
 
+type ReportKind = "general" | "financial" | "operational" | "statistics";
+
 type ReportsClientProps = {
     initialView?: "summary" | "analytics" | "table";
     fixedView?: boolean;
+    reportKind?: ReportKind;
     system: SystemSettings;
     user: CurrentUser;
 };
@@ -280,6 +284,7 @@ type ReportsClientProps = {
 export function ReportsClient({
     initialView = "summary",
     fixedView = false,
+    reportKind = "general",
     system,
     user
 }: ReportsClientProps) {
@@ -294,6 +299,7 @@ export function ReportsClient({
     const [message, setMessage] = useState("");
     const [activeTab, setActiveTab] =
         useState<"summary" | "analytics" | "table">(initialView);
+    const chartsContainerRef = useRef<HTMLDivElement | null>(null);
 
     const rows = report ? report.data : [];
 
@@ -380,10 +386,267 @@ export function ReportsClient({
         setAppliedFilters(initialFilters);
     }
 
-    function exportPdf() {
-        if (!report || rows.length === 0) {
-            setMessage("Não existem registos para exportar.");
+    function reportTitle(): string {
+        if (reportKind === "financial") return "RELATÓRIO FINANCEIRO";
+        if (reportKind === "operational") return "RELATÓRIO OPERACIONAL";
+        if (reportKind === "statistics") return "RELATÓRIO ESTATÍSTICO";
+        return "RELATÓRIO GERAL";
+    }
+
+    async function waitForChartsToRender(): Promise<void> {
+        if (document.fonts?.ready) {
+            await document.fonts.ready;
+        }
+
+        await new Promise<void>(function(resolve) {
+            window.requestAnimationFrame(function() {
+                window.requestAnimationFrame(function() {
+                    window.setTimeout(resolve, 180);
+                });
+            });
+        });
+    }
+
+    async function captureReportCharts(): Promise<Array<{
+        title: string;
+        image: string;
+        width: number;
+        height: number;
+    }>> {
+        if (!chartsContainerRef.current) {
+            return [];
+        }
+
+        await waitForChartsToRender();
+
+        const cards = Array.from(
+            chartsContainerRef.current.querySelectorAll<HTMLElement>(
+                ".report-chart-card"
+            )
+        ).filter(function(card) {
+            const rect = card.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        });
+
+        const charts: Array<{
+            title: string;
+            image: string;
+            width: number;
+            height: number;
+        }> = [];
+
+        for (const card of cards) {
+            const title =
+                card.querySelector("h3")?.textContent?.trim() ||
+                "Gráfico";
+            const rect = card.getBoundingClientRect();
+
+            try {
+                const image = await toPng(card, {
+                    cacheBust: true,
+                    pixelRatio: 3,
+                    width: Math.ceil(rect.width),
+                    height: Math.ceil(rect.height),
+                    backgroundColor: window.getComputedStyle(card)
+                        .backgroundColor || "#0f172a",
+                    style: {
+                        margin: "0",
+                        transform: "none",
+                        overflow: "visible"
+                    },
+                    filter: function(node) {
+                        if (!(node instanceof HTMLElement)) {
+                            return true;
+                        }
+
+                        return !node.classList.contains("no-print");
+                    }
+                });
+
+                charts.push({
+                    title,
+                    image,
+                    width: Math.ceil(rect.width),
+                    height: Math.ceil(rect.height)
+                });
+            } catch (chartError) {
+                console.error(
+                    `Erro ao capturar o gráfico ${title}:`,
+                    chartError
+                );
+            }
+        }
+
+        return charts;
+    }
+
+    function addInstitutionalHeader(
+        doc: jsPDF,
+        title: string
+    ): number {
+        if (!report) return 42;
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const centerX = pageWidth / 2;
+        const countryName =
+            system.country_name ||
+            "República Democrática de São Tomé e Príncipe";
+        const institutionName =
+            system.institution_name ||
+            "Direção Geral do Turismo e Hotelaria";
+        const systemName =
+            system.system_name ||
+            "Sistema Nacional de Gestão da Taxa Turística";
+        const generatedBy =
+            user.full_name || user.user_name || "Utilizador";
+
+        doc.setTextColor(15, 23, 42);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(15);
+        doc.text(countryName.toUpperCase(), centerX, 12, { align: "center" });
+        doc.setFontSize(12);
+        doc.text(institutionName.toUpperCase(), centerX, 19, { align: "center" });
+        doc.setFontSize(10);
+        doc.text(systemName.toUpperCase(), centerX, 25, { align: "center" });
+        doc.setFontSize(13);
+        doc.text(title, centerX, 34, { align: "center" });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(51, 65, 85);
+        doc.text(
+            `Gerado em: ${dateTime(report.generated_at)} — por: ${generatedBy}`,
+            centerX,
+            40,
+            { align: "center" }
+        );
+
+        return 47;
+    }
+
+    function addPageNumbers(doc: jsPDF) {
+        const pages = doc.getNumberOfPages();
+
+        for (let page = 1; page <= pages; page++) {
+            doc.setPage(page);
+            const width = doc.internal.pageSize.getWidth();
+            const height = doc.internal.pageSize.getHeight();
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.setTextColor(71, 85, 105);
+            doc.text(
+                `${system.system_name || "Sistema de Taxa Turística"} · Página ${page} de ${pages}`,
+                width / 2,
+                height - 5,
+                { align: "center" }
+            );
+        }
+    }
+
+    function addOperationalTablesToPdf(
+        doc: jsPDF,
+        title: string
+    ) {
+        if (!report || reportKind !== "operational") {
             return;
+        }
+
+        const operationalTables: Array<{
+            title: string;
+            rows: ReportGroupRow[];
+        }> = [
+            {
+                title: "Por ligação",
+                rows: report.analytics.by_flight
+            },
+            {
+                title: "Por motivo da viagem",
+                rows: report.analytics.by_visit_reason
+            },
+            {
+                title: "Por nacionalidade",
+                rows: report.analytics.by_nationality
+            },
+            {
+                title: "Por posto",
+                rows: report.analytics.by_post
+            },
+            {
+                title: "Por operador",
+                rows: report.analytics.by_operator
+            },
+            {
+                title: "Por companhia",
+                rows: report.analytics.by_company
+            },
+            {
+                title: "Por proveniência",
+                rows: report.analytics.by_origin
+            }
+        ];
+
+        operationalTables.forEach(function(table) {
+            doc.addPage("a4", "landscape");
+            const startY = addInstitutionalHeader(
+                doc,
+                `${title} — ${table.title.toUpperCase()}`
+            );
+
+            autoTable(doc, {
+                startY: startY + 3,
+                head: [[
+                    "Designação",
+                    "Registos",
+                    "Pagamentos",
+                    "Recusas",
+                    "Isenções",
+                    "Dobras",
+                    "Euros",
+                    "Dólares"
+                ]],
+                body: table.rows.map(function(row) {
+                    return [
+                        row.name || "—",
+                        row.records,
+                        row.payments,
+                        row.refusals,
+                        row.exemptions,
+                        Number(row.dobra_total || 0).toFixed(2),
+                        Number(row.euro_total || 0).toFixed(2),
+                        Number(row.dollar_total || 0).toFixed(2)
+                    ];
+                }),
+                tableWidth: "auto",
+                styles: {
+                    fontSize: 7.2,
+                    cellPadding: 1.8,
+                    overflow: "linebreak",
+                    valign: "middle"
+                },
+                headStyles: {
+                    fillColor: [15, 27, 45],
+                    textColor: [255, 255, 255]
+                },
+                alternateRowStyles: {
+                    fillColor: [241, 245, 249]
+                },
+                columnStyles: {
+                    0: { cellWidth: 62 }
+                },
+                margin: {
+                    left: 10,
+                    right: 10,
+                    bottom: 12
+                },
+                showHead: "everyPage",
+                rowPageBreak: "avoid"
+            });
+        });
+    }
+
+    async function createReportPdf(): Promise<jsPDF | null> {
+        if (!report || rows.length === 0) {
+            setMessage("Não existem registos para gerar o relatório.");
+            return null;
         }
 
         const doc = new jsPDF({
@@ -391,143 +654,19 @@ export function ReportsClient({
             unit: "mm",
             format: "a4"
         });
-
-        const pageWidth =
-            doc.internal.pageSize.getWidth();
-
-        const pageHeight =
-            doc.internal.pageSize.getHeight();
-
-        const centerX =
-            pageWidth / 2;
-
-        const countryName =
-            system.country_name ||
-            "República Democrática de São Tomé e Príncipe";
-
-        const institutionName =
-            system.institution_name ||
-            "Direção Geral do Turismo e Hotelaria";
-
-        const systemName =
-            system.system_name ||
-            "Sistema Nacional de Gestão da Taxa Turística";
-
-        const generatedBy =
-            user.full_name ||
-            user.user_name ||
-            "Utilizador";
-
-        /*
-         * Cabeçalho institucional centralizado.
-         */
-        doc.setTextColor(
-            15,
-            23,
-            42
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const title = reportTitle();
+        let currentY = addInstitutionalHeader(doc, title);
+        const description = filtersDescription(appliedFilters);
+        const wrappedDescription = doc.splitTextToSize(
+            `Filtros: ${description}`,
+            pageWidth - 28
         );
 
-        doc.setFont(
-            "helvetica",
-            "bold"
-        );
-
-        doc.setFontSize(15);
-
-        doc.text(
-            countryName.toUpperCase(),
-            centerX,
-            12,
-            {
-                align: "center"
-            }
-        );
-
-        doc.setFontSize(12);
-
-        doc.text(
-            institutionName.toUpperCase(),
-            centerX,
-            19,
-            {
-                align: "center"
-            }
-        );
-
-        doc.setFontSize(10);
-
-        doc.text(
-            systemName.toUpperCase(),
-            centerX,
-            25,
-            {
-                align: "center"
-            }
-        );
-
-        doc.setFontSize(13);
-
-        doc.text(
-            "RELATÓRIO GERAL",
-            centerX,
-            34,
-            {
-                align: "center"
-            }
-        );
-
-        doc.setFont(
-            "helvetica",
-            "normal"
-        );
-
+        doc.setTextColor(15, 23, 42);
         doc.setFontSize(8);
-
-        doc.setTextColor(
-            51,
-            65,
-            85
-        );
-
-        doc.text(
-            `Gerado em: ${dateTime(
-                report.generated_at
-            )} — por: ${generatedBy}`,
-            centerX,
-            40,
-            {
-                align: "center"
-            }
-        );
-
-        const description =
-            filtersDescription(
-                appliedFilters
-            );
-
-        const wrappedDescription =
-            doc.splitTextToSize(
-                `Filtros: ${description}`,
-                pageWidth - 28
-            );
-
-        doc.setTextColor(
-            15,
-            23,
-            42
-        );
-
-        doc.text(
-            wrappedDescription,
-            14,
-            47
-        );
-
-        const filtersHeight =
-            wrappedDescription.length * 4;
-
-        const summaryY =
-            51 + filtersHeight;
+        doc.text(wrappedDescription, 14, currentY);
+        currentY += wrappedDescription.length * 4 + 4;
 
         doc.text(
             `Registos: ${report.summary.total_records} | ` +
@@ -536,162 +675,192 @@ export function ReportsClient({
             `Recusas: ${report.summary.refusals} | ` +
             `Isenções: ${report.summary.exemptions}`,
             14,
-            summaryY
+            currentY
         );
-
+        currentY += 5;
         doc.text(
-            `Totais: ${money(
-                report.summary.dobra_total,
-                "DOBRA"
-            )} | ` +
-            `${money(
-                report.summary.euro_total,
-                "EURO"
-            )} | ` +
-            `${money(
-                report.summary.dollar_total,
-                "DOLAR"
-            )} | ` +
+            `Totais: ${money(report.summary.dobra_total, "DOBRA")} | ` +
+            `${money(report.summary.euro_total, "EURO")} | ` +
+            `${money(report.summary.dollar_total, "DOLAR")} | ` +
             `Noites: ${report.summary.total_nights} | ` +
             `Média: ${report.summary.average_nights}`,
             14,
-            summaryY + 5
+            currentY
         );
+        currentY += 5;
+
+        const isFinancial = reportKind === "financial";
+        const isStatistics = reportKind === "statistics";
+
+        const tableHead = isFinancial
+            ? [[
+                "Data", "Recibo", "Passaporte", "Nome", "Ação",
+                "Pagamento", "Moeda", "Valor", "Posto", "Operador"
+            ]]
+            : isStatistics
+              ? [[
+                    "Data", "Passaporte", "Nacionalidade", "Sexo",
+                    "Ligação", "Motivo", "Ação", "Noites", "Posto"
+                ]]
+              : [[
+                    "Data", "Recibo", "Passaporte", "Nome", "Ligação",
+                    "Motivo", "Ação", "Pagamento", "Moeda", "Valor", "Posto"
+                ]];
+
+        const tableBody = rows.map(function(payment) {
+            if (isFinancial) {
+                return [
+                    dateTime(payment.local_created_at),
+                    payment.receipt_no,
+                    payment.passport,
+                    `${payment.name} ${payment.surname || ""}`.trim(),
+                    actionLabel(payment.payment_action),
+                    payment.payment_type || "—",
+                    payment.currency || "—",
+                    Number(payment.amount || 0).toFixed(2),
+                    payment.post_code,
+                    payment.operator_name || "—"
+                ];
+            }
+
+            if (isStatistics) {
+                return [
+                    dateTime(payment.local_created_at),
+                    payment.passport,
+                    payment.nationality || "—",
+                    payment.gender || "—",
+                    payment.flight_code || "—",
+                    payment.visit_reason || "—",
+                    actionLabel(payment.payment_action),
+                    payment.nights,
+                    payment.post_code
+                ];
+            }
+
+            return [
+                dateTime(payment.local_created_at),
+                payment.receipt_no,
+                payment.passport,
+                `${payment.name} ${payment.surname || ""}`.trim(),
+                payment.flight_code || "—",
+                payment.visit_reason || "—",
+                actionLabel(payment.payment_action),
+                payment.payment_type || "—",
+                payment.currency || "—",
+                Number(payment.amount || 0).toFixed(2),
+                payment.post_code
+            ];
+        });
 
         autoTable(doc, {
-            startY: summaryY + 10,
-
-            head: [[
-                "Data",
-                "Recibo",
-                "Passaporte",
-                "Nome",
-                "Ligação",
-                "Motivo",
-                "Ação",
-                "Pagamento",
-                "Moeda",
-                "Valor",
-                "Posto"
-            ]],
-
-            body: rows.map(
-                function(payment) {
-                    return [
-                        dateTime(
-                            payment.local_created_at
-                        ),
-
-                        payment.receipt_no,
-
-                        payment.passport,
-
-                        `${payment.name} ${
-                            payment.surname ||
-                            ""
-                        }`.trim(),
-
-                        payment.flight_code ||
-                        "—",
-
-                        payment.visit_reason ||
-                        "—",
-
-                        actionLabel(
-                            payment.payment_action
-                        ),
-
-                        payment.payment_type ||
-                        "—",
-
-                        payment.currency ||
-                        "—",
-
-                        Number(
-                            payment.amount ||
-                            0
-                        ).toFixed(2),
-
-                        payment.post_code
-                    ];
-                }
-            ),
-
+            startY: currentY + 5,
+            head: tableHead,
+            body: tableBody,
+            tableWidth: "auto",
             styles: {
                 fontSize: 6.3,
-                cellPadding: 1.4,
-                overflow: "linebreak"
+                cellPadding: 1.35,
+                overflow: "linebreak",
+                valign: "middle"
             },
-
             headStyles: {
-                fillColor: [
-                    15,
-                    27,
-                    45
-                ],
-
-                textColor: [
-                    255,
-                    255,
-                    255
-                ]
+                fillColor: [15, 27, 45],
+                textColor: [255, 255, 255]
             },
-
             alternateRowStyles: {
-                fillColor: [
-                    241,
-                    245,
-                    249
-                ]
+                fillColor: [241, 245, 249]
             },
-
             margin: {
                 left: 8,
                 right: 8,
-                bottom: 10
+                bottom: 12
             },
-
-            showHead:
-                "everyPage",
-
-            rowPageBreak:
-                "avoid",
-
-            didDrawPage:
-                function(data) {
-                    doc.setFont(
-                        "helvetica",
-                        "normal"
-                    );
-
-                    doc.setFontSize(7);
-
-                    doc.setTextColor(
-                        71,
-                        85,
-                        105
-                    );
-
-                    doc.text(
-                        `Página ${data.pageNumber}`,
-                        pageWidth - 10,
-                        pageHeight - 5,
-                        {
-                            align: "right"
-                        }
-                    );
-                }
+            showHead: "everyPage",
+            rowPageBreak: "avoid"
         });
 
-        doc.save(
-            reportFileName(
-                "pdf"
-            )
-        );
+        addOperationalTablesToPdf(doc, title);
 
-        setMessage(
-            "PDF gerado com sucesso."
-        );
+        if (reportKind === "financial" || reportKind === "statistics") {
+            const charts = await captureReportCharts();
+
+            charts.forEach(function(chart) {
+                doc.addPage("a4", "landscape");
+                const chartStartY = addInstitutionalHeader(
+                    doc,
+                    `${title} — ${chart.title.toUpperCase()}`
+                );
+                const marginX = 14;
+                const footerSpace = 12;
+                const availableWidth = pageWidth - marginX * 2;
+                const availableHeight =
+                    doc.internal.pageSize.getHeight() -
+                    chartStartY -
+                    footerSpace;
+                const sourceRatio = chart.width / chart.height;
+                let imageWidth = availableWidth;
+                let imageHeight = imageWidth / sourceRatio;
+
+                if (imageHeight > availableHeight) {
+                    imageHeight = availableHeight;
+                    imageWidth = imageHeight * sourceRatio;
+                }
+
+                const imageX = (pageWidth - imageWidth) / 2;
+                const imageY =
+                    chartStartY +
+                    Math.max(0, (availableHeight - imageHeight) / 2);
+
+                doc.addImage(
+                    chart.image,
+                    "PNG",
+                    imageX,
+                    imageY,
+                    imageWidth,
+                    imageHeight,
+                    undefined,
+                    "SLOW"
+                );
+            });
+        }
+
+        addPageNumbers(doc);
+        return doc;
+    }
+
+    async function exportPdf() {
+        const doc = await createReportPdf();
+
+        if (!doc) return;
+
+        doc.save(reportFileName("pdf"));
+        setMessage("PDF gerado com sucesso.");
+    }
+
+    async function printReport() {
+        const doc = await createReportPdf();
+
+        if (!doc) return;
+
+        doc.autoPrint({ variant: "non-conform" });
+        const printWindow = window.open("", "_blank");
+
+        if (!printWindow) {
+            setMessage(
+                "O navegador bloqueou a janela de impressão. Autorize pop-ups para este site."
+            );
+            return;
+        }
+
+        const pdfBlob = doc.output("blob");
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        printWindow.location.href = pdfUrl;
+
+        window.setTimeout(function() {
+            URL.revokeObjectURL(pdfUrl);
+        }, 60000);
+
+        setMessage("Relatório preparado para impressão.");
     }
 
     function exportExcel() {
@@ -721,7 +890,7 @@ export function ReportsClient({
                     "Sistema Nacional de Gestão da Taxa Turística"
                 ).toUpperCase()
             ],
-            ["RELATÓRIO GERAL"],
+            [reportTitle()],
             [],
             [
                 "Gerado em",
@@ -1007,9 +1176,6 @@ export function ReportsClient({
         );
     }
 
-    function printReport() {
-        window.print();
-    }
 
     const pieData = report
         ? [
@@ -1027,6 +1193,73 @@ export function ReportsClient({
             }
         ]
         : [];
+
+
+    const revenueByCurrency = useMemo(function() {
+        const totals = new Map<string, number>();
+
+        rows.forEach(function(payment) {
+            if (payment.payment_action !== "PAGAMENTO") {
+                return;
+            }
+
+            const currency = payment.currency || "SEM MOEDA";
+            totals.set(
+                currency,
+                (totals.get(currency) || 0) + Number(payment.amount || 0)
+            );
+        });
+
+        return Array.from(totals.entries())
+            .map(function([name, value]) {
+                return { name, value };
+            })
+            .sort(function(a, b) {
+                return b.value - a.value;
+            });
+    }, [rows]);
+
+    const paymentsByMethod = useMemo(function() {
+        const totals = new Map<string, number>();
+
+        rows.forEach(function(payment) {
+            if (payment.payment_action !== "PAGAMENTO") {
+                return;
+            }
+
+            const method = payment.payment_type || "NÃO INDICADO";
+            totals.set(method, (totals.get(method) || 0) + 1);
+        });
+
+        return Array.from(totals.entries())
+            .map(function([name, value]) {
+                return { name, value };
+            })
+            .sort(function(a, b) {
+                return b.value - a.value;
+            });
+    }, [rows]);
+
+    const paymentsByPost = useMemo(function() {
+        const totals = new Map<string, number>();
+
+        rows.forEach(function(payment) {
+            if (payment.payment_action !== "PAGAMENTO") {
+                return;
+            }
+
+            const post = payment.post_code || "SEM POSTO";
+            totals.set(post, (totals.get(post) || 0) + 1);
+        });
+
+        return Array.from(totals.entries())
+            .map(function([name, value]) {
+                return { name, value };
+            })
+            .sort(function(a, b) {
+                return b.value - a.value;
+            });
+    }, [rows]);
 
     const options = report
         ? report.options
@@ -1433,7 +1666,7 @@ export function ReportsClient({
             {!loading && report ? (
                 <>
                     {activeTab === "summary" ? (
-                        <>
+                        <div ref={chartsContainerRef}>
                             <section className="grid report-summary-grid">
                                 <article className="card report-stat">
                                     <span>Total de registos</span>
@@ -1526,227 +1759,294 @@ export function ReportsClient({
                                 </article>
                             </section>
 
-                            <section className="grid report-chart-grid">
-                                <article className="card report-chart-card">
-                                    <div className="report-card-head">
-                                        <h3>
-                                            Pagamentos, recusas e isenções
-                                        </h3>
-                                    </div>
+                            {reportKind === "financial" ? (
+                                <>
+                                    <section className="grid report-chart-grid">
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Receitas por moeda</h3>
+                                            </div>
 
-                                    <div className="report-chart">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <PieChart>
-                                                <Pie
-                                                    data={pieData}
-                                                    dataKey="value"
-                                                    nameKey="name"
-                                                    outerRadius={95}
-                                                    label
-                                                >
-                                                    {pieData.map(
-                                                        function(
-                                                            entry,
-                                                            index
-                                                        ) {
-                                                            return (
-                                                                <Cell
-                                                                    key={
-                                                                        entry.name
-                                                                    }
-                                                                    fill={
-                                                                        pieColors[
-                                                                            index %
-                                                                                pieColors.length
-                                                                        ]
-                                                                    }
-                                                                />
-                                                            );
-                                                        }
-                                                    )}
-                                                </Pie>
-                                                <Tooltip />
-                                                <Legend />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </article>
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={revenueByCurrency}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            dataKey="name"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Bar
+                                                            dataKey="value"
+                                                            name="Receita"
+                                                            fill="#22c55e"
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
 
-                                <article className="card report-chart-card">
-                                    <div className="report-card-head">
-                                        <h3>Evolução diária</h3>
-                                    </div>
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Pagamentos por método</h3>
+                                            </div>
 
-                                    <div className="report-chart">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <LineChart
-                                                data={
-                                                    report.analytics
-                                                        .daily
-                                                }
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    stroke="#23354d"
-                                                />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tick={{
-                                                        fill: "#91a4be",
-                                                        fontSize: 11
-                                                    }}
-                                                />
-                                                <YAxis
-                                                    tick={{
-                                                        fill: "#91a4be",
-                                                        fontSize: 11
-                                                    }}
-                                                />
-                                                <Tooltip />
-                                                <Legend />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="payments"
-                                                    name="Pagamentos"
-                                                    stroke="#22c55e"
-                                                    strokeWidth={2}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="refusals"
-                                                    name="Recusas"
-                                                    stroke="#ef4444"
-                                                    strokeWidth={2}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="exemptions"
-                                                    name="Isenções"
-                                                    stroke="#f59e0b"
-                                                    strokeWidth={2}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </article>
-                            </section>
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={paymentsByMethod}
+                                                        layout="vertical"
+                                                        margin={{ left: 25, right: 20 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            type="category"
+                                                            dataKey="name"
+                                                            width={105}
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Bar
+                                                            dataKey="value"
+                                                            name="Pagamentos"
+                                                            fill="#3b82f6"
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
+                                    </section>
 
-                            <section className="grid report-chart-grid">
-                                <article className="card report-chart-card">
-                                    <div className="report-card-head">
-                                        <h3>
-                                            Ligações mais utilizadas
-                                        </h3>
-                                    </div>
+                                    <section className="grid report-chart-grid">
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Pagamentos por posto</h3>
+                                            </div>
 
-                                    <div className="report-chart">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <BarChart
-                                                data={topRows(
-                                                    report.analytics
-                                                        .by_flight
-                                                )}
-                                                layout="vertical"
-                                                margin={{
-                                                    left: 25,
-                                                    right: 20
-                                                }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    stroke="#23354d"
-                                                />
-                                                <XAxis
-                                                    type="number"
-                                                    tick={{
-                                                        fill: "#91a4be",
-                                                        fontSize: 11
-                                                    }}
-                                                />
-                                                <YAxis
-                                                    type="category"
-                                                    dataKey="name"
-                                                    width={90}
-                                                    tick={{
-                                                        fill: "#91a4be",
-                                                        fontSize: 11
-                                                    }}
-                                                />
-                                                <Tooltip />
-                                                <Bar
-                                                    dataKey="records"
-                                                    name="Registos"
-                                                    fill="#3b82f6"
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </article>
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={paymentsByPost}
+                                                        layout="vertical"
+                                                        margin={{ left: 25, right: 20 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            type="category"
+                                                            dataKey="name"
+                                                            width={90}
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Bar
+                                                            dataKey="value"
+                                                            name="Pagamentos"
+                                                            fill="#f59e0b"
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
 
-                                <article className="card report-chart-card">
-                                    <div className="report-card-head">
-                                        <h3>
-                                            Motivos de viagem
-                                        </h3>
-                                    </div>
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Pagamentos, recusas e isenções</h3>
+                                            </div>
 
-                                    <div className="report-chart">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <BarChart
-                                                data={topRows(
-                                                    report.analytics
-                                                        .by_visit_reason
-                                                )}
-                                                layout="vertical"
-                                                margin={{
-                                                    left: 25,
-                                                    right: 20
-                                                }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    stroke="#23354d"
-                                                />
-                                                <XAxis
-                                                    type="number"
-                                                    tick={{
-                                                        fill: "#91a4be",
-                                                        fontSize: 11
-                                                    }}
-                                                />
-                                                <YAxis
-                                                    type="category"
-                                                    dataKey="name"
-                                                    width={105}
-                                                    tick={{
-                                                        fill: "#91a4be",
-                                                        fontSize: 11
-                                                    }}
-                                                />
-                                                <Tooltip />
-                                                <Bar
-                                                    dataKey="records"
-                                                    name="Registos"
-                                                    fill="#8b5cf6"
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </article>
-                            </section>
-                        </>
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={pieData}
+                                                            dataKey="value"
+                                                            nameKey="name"
+                                                            outerRadius={95}
+                                                            label
+                                                        >
+                                                            {pieData.map(function(entry, index) {
+                                                                return (
+                                                                    <Cell
+                                                                        key={entry.name}
+                                                                        fill={pieColors[index % pieColors.length]}
+                                                                    />
+                                                                );
+                                                            })}
+                                                        </Pie>
+                                                        <Tooltip />
+                                                        <Legend />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
+                                    </section>
+                                </>
+                            ) : null}
+
+                            {reportKind === "statistics" ? (
+                                <>
+                                    <section className="grid report-chart-grid">
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Distribuição por nacionalidade</h3>
+                                            </div>
+
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={topRows(report.analytics.by_nationality)}
+                                                        layout="vertical"
+                                                        margin={{ left: 25, right: 20 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            type="category"
+                                                            dataKey="name"
+                                                            width={110}
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Bar
+                                                            dataKey="records"
+                                                            name="Registos"
+                                                            fill="#14b8a6"
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
+
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Motivos de viagem</h3>
+                                            </div>
+
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={topRows(report.analytics.by_visit_reason)}
+                                                        layout="vertical"
+                                                        margin={{ left: 25, right: 20 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            type="category"
+                                                            dataKey="name"
+                                                            width={105}
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Bar
+                                                            dataKey="records"
+                                                            name="Registos"
+                                                            fill="#8b5cf6"
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
+                                    </section>
+
+                                    <section className="grid report-chart-grid">
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Ligações mais utilizadas</h3>
+                                            </div>
+
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={topRows(report.analytics.by_flight)}
+                                                        layout="vertical"
+                                                        margin={{ left: 25, right: 20 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            type="number"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            type="category"
+                                                            dataKey="name"
+                                                            width={90}
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Bar
+                                                            dataKey="records"
+                                                            name="Registos"
+                                                            fill="#3b82f6"
+                                                        />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
+
+                                        <article className="card report-chart-card">
+                                            <div className="report-card-head">
+                                                <h3>Evolução diária</h3>
+                                            </div>
+
+                                            <div className="report-chart">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={report.analytics.daily}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#23354d" />
+                                                        <XAxis
+                                                            dataKey="date"
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <YAxis
+                                                            tick={{ fill: "#91a4be", fontSize: 11 }}
+                                                        />
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="payments"
+                                                            name="Pagamentos"
+                                                            stroke="#22c55e"
+                                                            strokeWidth={2}
+                                                        />
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="refusals"
+                                                            name="Recusas"
+                                                            stroke="#ef4444"
+                                                            strokeWidth={2}
+                                                        />
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="exemptions"
+                                                            name="Isenções"
+                                                            stroke="#f59e0b"
+                                                            strokeWidth={2}
+                                                        />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </article>
+                                    </section>
+                                </>
+                            ) : null}
+                        </div>
                     ) : null}
 
                     {activeTab === "analytics" ? (
@@ -1801,6 +2101,7 @@ export function ReportsClient({
                     ) : null}
 
                     {activeTab === "table" ? (
+                        <>
                         <section className="card report-results">
                             <div className="report-results-header">
                                 <div>
@@ -1999,6 +2300,40 @@ export function ReportsClient({
                                 </div>
                             ) : null}
                         </section>
+
+                        {reportKind === "operational" ? (
+                            <section className="grid report-analytics-grid report-operational-tables">
+                                <GroupTable
+                                    title="Por ligação"
+                                    rows={report.analytics.by_flight}
+                                />
+                                <GroupTable
+                                    title="Por motivo da viagem"
+                                    rows={report.analytics.by_visit_reason}
+                                />
+                                <GroupTable
+                                    title="Por nacionalidade"
+                                    rows={report.analytics.by_nationality}
+                                />
+                                <GroupTable
+                                    title="Por posto"
+                                    rows={report.analytics.by_post}
+                                />
+                                <GroupTable
+                                    title="Por operador"
+                                    rows={report.analytics.by_operator}
+                                />
+                                <GroupTable
+                                    title="Por companhia"
+                                    rows={report.analytics.by_company}
+                                />
+                                <GroupTable
+                                    title="Por proveniência"
+                                    rows={report.analytics.by_origin}
+                                />
+                            </section>
+                        ) : null}
+                        </>
                     ) : null}
 
                     {activeTab !== "table" ? (

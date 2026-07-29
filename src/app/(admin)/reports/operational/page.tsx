@@ -54,6 +54,7 @@ export default async function Page() {
                 <ReportsClient
                     initialView="analytics"
                     fixedView={true}
+                    reportKind="operational"
                     system={system}
                     user={user}
                 />

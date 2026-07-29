@@ -46,7 +46,7 @@ export default async function Page() {
                         </h1>
 
                         <p className="muted">
-                            Receitas por moeda, pagamentos, recusas, isenções e evolução diária.
+                            Receitas por moeda, método de pagamento, posto e distribuição de pagamentos, recusas e isenções.
                         </p>
                     </div>
                 </div>
@@ -54,6 +54,7 @@ export default async function Page() {
                 <ReportsClient
                     initialView="summary"
                     fixedView={true}
+                    reportKind="financial"
                     system={system}
                     user={user}
                 />
