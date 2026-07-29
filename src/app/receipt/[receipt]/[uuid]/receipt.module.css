@@ -1,0 +1,265 @@
+.page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 32px 16px;
+    background: radial-gradient(circle at top left, rgba(59, 130, 246, .18), transparent 34%), radial-gradient(circle at bottom right, rgba(34, 197, 94, .12), transparent 30%), #07111f;
+}
+
+.panel {
+    width: min(820px, 100%);
+    overflow: hidden;
+    border: 1px solid #23354d;
+    border-radius: 22px;
+    background: rgba(15, 27, 45, .97);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .38);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 26px 30px;
+    border-bottom: 1px solid #23354d;
+}
+
+.brandMark {
+    width: 58px;
+    height: 58px;
+    flex: 0 0 58px;
+    display: grid;
+    place-items: center;
+    border-radius: 17px;
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+}
+
+.country,
+.systemName,
+.header h1 {
+    margin: 0;
+}
+
+.country {
+    margin-bottom: 4px;
+    color: #91a4be;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.header h1,
+.invalidPanel h1 {
+    color: #edf4ff;
+    font-size: clamp(20px, 4vw, 28px);
+}
+
+.systemName {
+    margin-top: 5px;
+    color: #91a4be;
+}
+
+.validBanner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 24px 30px 0;
+    padding: 17px 19px;
+    border: 1px solid rgba(34, 197, 94, .35);
+    border-radius: 14px;
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, .11);
+}
+
+.validBanner div {
+    display: grid;
+    gap: 4px;
+}
+
+.validBanner strong {
+    font-size: 19px;
+}
+
+.validBanner span {
+    color: #d1fae5;
+    font-size: 13px;
+}
+
+.receiptHero {
+    display: grid;
+    gap: 8px;
+    padding: 28px 30px 20px;
+}
+
+.receiptHero span,
+.amountCard span,
+.detailItem span {
+    color: #91a4be;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.receiptHero strong {
+    overflow-wrap: anywhere;
+    color: #fff;
+    font-size: clamp(20px, 4vw, 31px);
+}
+
+.receiptHero small,
+.amountCard small {
+    color: #91a4be;
+}
+
+.amountCard {
+    display: grid;
+    gap: 6px;
+    margin: 0 30px 24px;
+    padding: 20px;
+    border-radius: 15px;
+    background: #0b1728;
+}
+
+.amountCard strong {
+    color: #fff;
+    font-size: 30px;
+}
+
+.detailsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    margin: 0 30px 26px;
+    overflow: hidden;
+    border: 1px solid #23354d;
+    border-radius: 15px;
+    background: #23354d;
+}
+
+.detailItem {
+    min-width: 0;
+    display: flex;
+    gap: 12px;
+    padding: 18px;
+    color: #60a5fa;
+    background: #0b1728;
+}
+
+.detailItem div {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.detailItem strong {
+    overflow-wrap: anywhere;
+    color: #edf4ff;
+    font-size: 14px;
+}
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 30px;
+    border-top: 1px solid #23354d;
+    color: #91a4be;
+    font-size: 12px;
+}
+
+.invalidPanel {
+    padding: 44px 30px;
+    text-align: center;
+}
+
+.invalidPanel .brandMark {
+    margin: 0 auto 20px;
+}
+
+.invalidPanel .country {
+    margin-bottom: 8px;
+}
+
+.invalidPanel .systemName {
+    margin-top: 7px;
+}
+
+.invalidIcon {
+    width: 92px;
+    height: 92px;
+    display: grid;
+    place-items: center;
+    margin: 34px auto 18px;
+    border-radius: 50%;
+    color: #fecaca;
+    background: rgba(239, 68, 68, .14);
+}
+
+.invalidPanel h2 {
+    margin: 0;
+    color: #fecaca;
+    font-size: 27px;
+}
+
+.message {
+    margin: 12px auto 0;
+    color: #edf4ff;
+    font-size: 16px;
+}
+
+.helpText {
+    max-width: 540px;
+    margin: 18px auto 0;
+    color: #91a4be;
+    line-height: 1.6;
+}
+
+@media (max-width: 650px) {
+    .page {
+        padding: 14px;
+        place-items: start center;
+    }
+    .panel {
+        border-radius: 17px;
+    }
+    .header {
+        align-items: flex-start;
+        padding: 22px 20px;
+    }
+    .brandMark {
+        width: 48px;
+        height: 48px;
+        flex-basis: 48px;
+        border-radius: 14px;
+    }
+    .validBanner,
+    .receiptHero,
+    .amountCard,
+    .detailsGrid {
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+    .receiptHero {
+        padding-left: 0;
+        padding-right: 0;
+    }
+    .detailsGrid {
+        grid-template-columns: 1fr;
+    }
+    .footer {
+        display: grid;
+        padding: 18px 20px;
+    }
+}
+
+.brandLogo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.brandMark:has(.brandLogo) {
+    overflow: hidden;
+    background: transparent;
+}
