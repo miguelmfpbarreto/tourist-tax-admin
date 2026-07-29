@@ -32,11 +32,15 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { dateOnly, dateTime, money } from "@/lib/format";
 import type {
+    CurrentUser,
     Payment,
     PaymentReport,
     ReportFilters,
-    ReportGroupRow
+    ReportGroupRow,
+    SystemSettings
 } from "@/types";
+
+
 
 const initialFilters: ReportFilters = {
     search: "",
@@ -266,7 +270,19 @@ function GroupTable({
     );
 }
 
-export function ReportsClient() {
+type ReportsClientProps = {
+    initialView?: "summary" | "analytics" | "table";
+    fixedView?: boolean;
+    system: SystemSettings;
+    user: CurrentUser;
+};
+
+export function ReportsClient({
+    initialView = "summary",
+    fixedView = false,
+    system,
+    user
+}: ReportsClientProps) {
     const [filters, setFilters] =
         useState<ReportFilters>(initialFilters);
     const [appliedFilters, setAppliedFilters] =
@@ -277,7 +293,7 @@ export function ReportsClient() {
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
     const [activeTab, setActiveTab] =
-        useState<"summary" | "analytics" | "table">("summary");
+        useState<"summary" | "analytics" | "table">(initialView);
 
     const rows = report ? report.data : [];
 
@@ -376,41 +392,142 @@ export function ReportsClient() {
             format: "a4"
         });
 
-        doc.setFontSize(16);
-        doc.text(
-            "República Democrática de São Tomé e Príncipe",
-            14,
-            13
+        const pageWidth =
+            doc.internal.pageSize.getWidth();
+
+        const pageHeight =
+            doc.internal.pageSize.getHeight();
+
+        const centerX =
+            pageWidth / 2;
+
+        const countryName =
+            system.country_name ||
+            "República Democrática de São Tomé e Príncipe";
+
+        const institutionName =
+            system.institution_name ||
+            "Direção Geral do Turismo e Hotelaria";
+
+        const systemName =
+            system.system_name ||
+            "Sistema Nacional de Gestão da Taxa Turística";
+
+        const generatedBy =
+            user.full_name ||
+            user.user_name ||
+            "Utilizador";
+
+        /*
+         * Cabeçalho institucional centralizado.
+         */
+        doc.setTextColor(
+            15,
+            23,
+            42
         );
 
-        doc.setFontSize(14);
-        doc.text("Sistema de Taxa Turística", 14, 20);
+        doc.setFont(
+            "helvetica",
+            "bold"
+        );
+
+        doc.setFontSize(15);
+
+        doc.text(
+            countryName.toUpperCase(),
+            centerX,
+            12,
+            {
+                align: "center"
+            }
+        );
 
         doc.setFontSize(12);
-        doc.text("RELATÓRIO GERAL", 14, 27);
+
+        doc.text(
+            institutionName.toUpperCase(),
+            centerX,
+            19,
+            {
+                align: "center"
+            }
+        );
+
+        doc.setFontSize(10);
+
+        doc.text(
+            systemName.toUpperCase(),
+            centerX,
+            25,
+            {
+                align: "center"
+            }
+        );
+
+        doc.setFontSize(13);
+
+        doc.text(
+            "RELATÓRIO GERAL",
+            centerX,
+            34,
+            {
+                align: "center"
+            }
+        );
+
+        doc.setFont(
+            "helvetica",
+            "normal"
+        );
 
         doc.setFontSize(8);
+
+        doc.setTextColor(
+            51,
+            65,
+            85
+        );
+
         doc.text(
-            `Gerado em: ${dateTime(report.generated_at)}`,
-            14,
-            33
+            `Gerado em: ${dateTime(
+                report.generated_at
+            )} — por: ${generatedBy}`,
+            centerX,
+            40,
+            {
+                align: "center"
+            }
         );
 
         const description =
-            filtersDescription(appliedFilters);
+            filtersDescription(
+                appliedFilters
+            );
 
         const wrappedDescription =
             doc.splitTextToSize(
                 `Filtros: ${description}`,
-                265
+                pageWidth - 28
             );
 
-        doc.text(wrappedDescription, 14, 38);
+        doc.setTextColor(
+            15,
+            23,
+            42
+        );
+
+        doc.text(
+            wrappedDescription,
+            14,
+            47
+        );
 
         const filtersHeight =
             wrappedDescription.length * 4;
 
-        const summaryY = 42 + filtersHeight;
+        const summaryY =
+            51 + filtersHeight;
 
         doc.text(
             `Registos: ${report.summary.total_records} | ` +
@@ -423,9 +540,18 @@ export function ReportsClient() {
         );
 
         doc.text(
-            `Totais: ${money(report.summary.dobra_total, "DOBRA")} | ` +
-            `${money(report.summary.euro_total, "EURO")} | ` +
-            `${money(report.summary.dollar_total, "DOLAR")} | ` +
+            `Totais: ${money(
+                report.summary.dobra_total,
+                "DOBRA"
+            )} | ` +
+            `${money(
+                report.summary.euro_total,
+                "EURO"
+            )} | ` +
+            `${money(
+                report.summary.dollar_total,
+                "DOLAR"
+            )} | ` +
             `Noites: ${report.summary.total_nights} | ` +
             `Média: ${report.summary.average_nights}`,
             14,
@@ -434,6 +560,7 @@ export function ReportsClient() {
 
         autoTable(doc, {
             startY: summaryY + 10,
+
             head: [[
                 "Data",
                 "Recibo",
@@ -447,54 +574,124 @@ export function ReportsClient() {
                 "Valor",
                 "Posto"
             ]],
-            body: rows.map(function(payment) {
-                return [
-                    dateTime(payment.local_created_at),
-                    payment.receipt_no,
-                    payment.passport,
-                    `${payment.name} ${
-                        payment.surname || ""
-                    }`.trim(),
-                    payment.flight_code || "—",
-                    payment.visit_reason || "—",
-                    actionLabel(payment.payment_action),
-                    payment.payment_type || "—",
-                    payment.currency || "—",
-                    Number(payment.amount || 0).toFixed(2),
-                    payment.post_code
-                ];
-            }),
+
+            body: rows.map(
+                function(payment) {
+                    return [
+                        dateTime(
+                            payment.local_created_at
+                        ),
+
+                        payment.receipt_no,
+
+                        payment.passport,
+
+                        `${payment.name} ${
+                            payment.surname ||
+                            ""
+                        }`.trim(),
+
+                        payment.flight_code ||
+                        "—",
+
+                        payment.visit_reason ||
+                        "—",
+
+                        actionLabel(
+                            payment.payment_action
+                        ),
+
+                        payment.payment_type ||
+                        "—",
+
+                        payment.currency ||
+                        "—",
+
+                        Number(
+                            payment.amount ||
+                            0
+                        ).toFixed(2),
+
+                        payment.post_code
+                    ];
+                }
+            ),
+
             styles: {
                 fontSize: 6.3,
                 cellPadding: 1.4,
                 overflow: "linebreak"
             },
+
             headStyles: {
-                fillColor: [15, 27, 45],
-                textColor: [255, 255, 255]
+                fillColor: [
+                    15,
+                    27,
+                    45
+                ],
+
+                textColor: [
+                    255,
+                    255,
+                    255
+                ]
             },
+
             alternateRowStyles: {
-                fillColor: [241, 245, 249]
+                fillColor: [
+                    241,
+                    245,
+                    249
+                ]
             },
+
             margin: {
                 left: 8,
-                right: 8
+                right: 8,
+                bottom: 10
             },
-            didDrawPage: function(data) {
-                doc.setFontSize(7);
-                doc.text(
-                    `Página ${data.pageNumber}`,
-                    280,
-                    202,
-                    {
-                        align: "right"
-                    }
-                );
-            }
+
+            showHead:
+                "everyPage",
+
+            rowPageBreak:
+                "avoid",
+
+            didDrawPage:
+                function(data) {
+                    doc.setFont(
+                        "helvetica",
+                        "normal"
+                    );
+
+                    doc.setFontSize(7);
+
+                    doc.setTextColor(
+                        71,
+                        85,
+                        105
+                    );
+
+                    doc.text(
+                        `Página ${data.pageNumber}`,
+                        pageWidth - 10,
+                        pageHeight - 5,
+                        {
+                            align: "right"
+                        }
+                    );
+                }
         });
 
-        doc.save(reportFileName("pdf"));
-        setMessage("PDF gerado com sucesso.");
+        doc.save(
+            reportFileName(
+                "pdf"
+            )
+        );
+
+        setMessage(
+            "PDF gerado com sucesso."
+        );
     }
 
     function exportExcel() {
@@ -506,12 +703,42 @@ export function ReportsClient() {
         const workbook = XLSX.utils.book_new();
 
         const summaryRows = [
-            ["REPÚBLICA DEMOCRÁTICA DE SÃO TOMÉ E PRÍNCIPE"],
-            ["SISTEMA DE TAXA TURÍSTICA"],
+            [
+                (
+                    system.country_name ||
+                    "República Democrática de São Tomé e Príncipe"
+                ).toUpperCase()
+            ],
+            [
+                (
+                    system.institution_name ||
+                    "Direção Geral do Turismo e Hotelaria"
+                ).toUpperCase()
+            ],
+            [
+                (
+                    system.system_name ||
+                    "Sistema Nacional de Gestão da Taxa Turística"
+                ).toUpperCase()
+            ],
             ["RELATÓRIO GERAL"],
             [],
-            ["Gerado em", dateTime(report.generated_at)],
-            ["Filtros", filtersDescription(appliedFilters)],
+            [
+                "Gerado em",
+                `${dateTime(
+                    report.generated_at
+                )} — por: ${
+                    user.full_name ||
+                    user.user_name ||
+                    "Utilizador"
+                }`
+            ],
+            [
+                "Filtros",
+                filtersDescription(
+                    appliedFilters
+                )
+            ],
             [],
             ["Indicador", "Valor"],
             ["Total de registos", report.summary.total_records],
@@ -1147,6 +1374,7 @@ export function ReportsClient() {
                 </div>
             ) : null}
 
+            {!fixedView ? (
             <section className="report-tabs no-print">
                 <button
                     type="button"
@@ -1190,6 +1418,7 @@ export function ReportsClient() {
                     Tabela
                 </button>
             </section>
+            ) : null}
 
             {loading ? (
                 <section className="card report-loading-panel">

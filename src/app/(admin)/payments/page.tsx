@@ -1,1 +1,328 @@
-import Link from"next/link";import{PaymentFilters}from"@/components/PaymentFilters";import{apiRequest}from"@/lib/api";import{getToken}from"@/lib/session";import{dateTime,money}from"@/lib/format";import type{PaymentList}from"@/types";export default async function Page({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){const p=await searchParams,t=await getToken(),q=new URLSearchParams();for(const k of["search","payment_action","currency","date_from","date_to","page"]){if(p[k])q.set(k,p[k]!)}q.set("limit","20");const x=await apiRequest<PaymentList>(`/admin/payments?${q}`,{token:t||undefined});const pages=Math.max(Math.ceil(x.total/x.limit),1);const url=(n:number)=>{const z=new URLSearchParams(q);z.set("page",String(n));return`/payments?${z}`};return <main className="page"><div className="page-head"><h1>Pagamentos</h1><p className="muted">Pesquisa e consulta dos registos.</p></div><PaymentFilters/><section className="card"><div className="table-wrap"><table className="table"><thead><tr><th>Data</th><th>Recibo</th><th>Passaporte</th><th>Nome</th><th>Ação</th><th>Valor</th><th>Posto</th><th>Dispositivo</th></tr></thead><tbody>{x.data.map(v=><tr key={v.uuid}><td>{dateTime(v.local_created_at)}</td><td><Link href={`/payments/${v.uuid}`}>{v.receipt_no}</Link></td><td>{v.passport}</td><td>{v.name} {v.surname||""}</td><td><span className={`badge ${v.payment_action==="PAGAMENTO"?"success":v.payment_action==="ISENÇÃO"?"warning":"danger"}`}>{v.payment_action}</span></td><td>{money(v.amount,v.currency)}</td><td>{v.post_code}</td><td>{v.device_name}</td></tr>)}</tbody></table></div><div className="pagination"><span className="muted">Página {x.page} de {pages} · {x.total} registo(s)</span><div>{x.page>1?<Link className="btn secondary" href={url(x.page-1)}>Anterior</Link>:null} {x.page<pages?<Link className="btn secondary" href={url(x.page+1)}>Seguinte</Link>:null}</div></div></section></main>}
+import Link from "next/link";
+
+import {
+    AccessDenied
+} from "@/components/AccessDenied";
+
+import {
+    PaymentFilters
+} from "@/components/PaymentFilters";
+
+import {
+    ApiRequestError,
+    apiRequest
+} from "@/lib/api";
+
+import {
+    dateTime,
+    money
+} from "@/lib/format";
+
+import {
+    getToken
+} from "@/lib/session";
+
+import type {
+    PaymentList
+} from "@/types";
+
+type SearchParams = Promise<
+    Record<
+        string,
+        string | undefined
+    >
+>;
+
+export default async function Page({
+    searchParams
+}: {
+    searchParams: SearchParams;
+}) {
+    const params =
+        await searchParams;
+
+    const token =
+        await getToken();
+
+    const query =
+        new URLSearchParams();
+
+    [
+        "search",
+        "payment_action",
+        "currency",
+        "date_from",
+        "date_to",
+        "page"
+    ].forEach(
+        function(key) {
+            const value =
+                params[key];
+
+            if (value) {
+                query.set(
+                    key,
+                    value
+                );
+            }
+        }
+    );
+
+    query.set(
+        "limit",
+        "20"
+    );
+
+    let result:
+        PaymentList;
+
+    try {
+        result =
+            await apiRequest<PaymentList>(
+                `/admin/payments?${query.toString()}`,
+                {
+                    token:
+                        token ||
+                        undefined
+                }
+            );
+    } catch (error) {
+        if (
+            error instanceof
+                ApiRequestError &&
+            (
+                error.status ===
+                    401 ||
+                error.status ===
+                    403
+            )
+        ) {
+            return (
+                <AccessDenied
+                    message={
+                        error.message
+                    }
+                />
+            );
+        }
+
+        throw error;
+    }
+
+    const totalPages =
+        Math.max(
+            Math.ceil(
+                result.total /
+                result.limit
+            ),
+            1
+        );
+
+    function pageUrl(
+        page: number
+    ): string {
+        const next =
+            new URLSearchParams(
+                query
+            );
+
+        next.set(
+            "page",
+            String(page)
+        );
+
+        return `/payments?${next.toString()}`;
+    }
+
+    return (
+        <main className="page">
+            <div className="page-head">
+                <h1>
+                    Pagamentos
+                </h1>
+
+                <p className="muted">
+                    Pesquisa e consulta dos registos.
+                </p>
+            </div>
+
+            <PaymentFilters />
+
+            <section className="card">
+                <div className="table-wrap">
+                    <table className="table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    Data
+                                </th>
+
+                                <th>
+                                    Recibo
+                                </th>
+
+                                <th>
+                                    Passaporte
+                                </th>
+
+                                <th>
+                                    Nome
+                                </th>
+
+                                <th>
+                                    Ação
+                                </th>
+
+                                <th>
+                                    Valor
+                                </th>
+
+                                <th>
+                                    Posto
+                                </th>
+
+                                <th>
+                                    Dispositivo
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {result.data.map(
+                                function(payment) {
+                                    return (
+                                        <tr
+                                            key={
+                                                payment.uuid
+                                            }
+                                        >
+                                            <td>
+                                                {dateTime(
+                                                    payment.local_created_at
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                <Link
+                                                    href={`/payments/${payment.uuid}`}
+                                                >
+                                                    {
+                                                        payment.receipt_no
+                                                    }
+                                                </Link>
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    payment.passport
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    payment.name
+                                                }{" "}
+                                                {
+                                                    payment.surname ||
+                                                    ""
+                                                }
+                                            </td>
+
+                                            <td>
+                                                <span
+                                                    className={`badge ${
+                                                        payment.payment_action ===
+                                                        "PAGAMENTO"
+                                                            ? "success"
+                                                            : payment.payment_action ===
+                                                              "ISENÇÃO"
+                                                                ? "warning"
+                                                                : "danger"
+                                                    }`}
+                                                >
+                                                    {
+                                                        payment.payment_action
+                                                    }
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                {money(
+                                                    payment.amount,
+                                                    payment.currency
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    payment.post_code
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    payment.device_name
+                                                }
+                                            </td>
+                                        </tr>
+                                    );
+                                }
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {result.data.length ===
+                0 ? (
+                    <div className="empty">
+                        Nenhum registo encontrado.
+                    </div>
+                ) : null}
+
+                <div className="pagination">
+                    <span className="muted">
+                        Página{" "}
+                        {result.page} de{" "}
+                        {totalPages} ·{" "}
+                        {result.total}{" "}
+                        registo(s)
+                    </span>
+
+                    <div
+                        style={{
+                            display:
+                                "flex",
+                            gap: 8
+                        }}
+                    >
+                        {result.page >
+                        1 ? (
+                            <Link
+                                className="btn secondary"
+                                href={pageUrl(
+                                    result.page -
+                                        1
+                                )}
+                            >
+                                Anterior
+                            </Link>
+                        ) : null}
+
+                        {result.page <
+                        totalPages ? (
+                            <Link
+                                className="btn secondary"
+                                href={pageUrl(
+                                    result.page +
+                                        1
+                                )}
+                            >
+                                Seguinte
+                            </Link>
+                        ) : null}
+                    </div>
+                </div>
+            </section>
+        </main>
+    );
+}

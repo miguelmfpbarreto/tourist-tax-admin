@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 import {
     Building2,
     CircleDollarSign,
@@ -9,82 +10,160 @@ import {
     Tags
 } from "lucide-react";
 
+import {
+    AccessDenied
+} from "@/components/AccessDenied";
+
+import {
+    hasPermission,
+    PERMISSIONS
+} from "@/lib/permissions";
+
+import {
+    requireUser
+} from "@/lib/session";
+
 const modules = [
     {
         href: "/configuration/posts",
         title: "Postos",
-        description: "Postos de entrada e cobrança.",
-        icon: Building2
+        description:
+            "Postos de entrada e cobrança.",
+        icon: Building2,
+        permission:
+            PERMISSIONS.postsView
     },
     {
         href: "/configuration/devices",
         title: "Dispositivos",
-        description: "Terminais Electron e respetivos estados.",
-        icon: MonitorCog
+        description:
+            "Registo, configuração e controlo dos terminais Electron.",
+        icon: MonitorCog,
+        permission:
+            PERMISSIONS.syncDevicesView
     },
     {
         href: "/configuration/flights",
         title: "Ligações",
-        description: "Voos e embarcações por posto.",
-        icon: Plane
+        description:
+            "Voos e embarcações por posto.",
+        icon: Plane,
+        permission:
+            PERMISSIONS.flightsView
     },
     {
         href: "/configuration/countries",
         title: "Países",
-        description: "Países e códigos ICAO.",
-        icon: Flag
+        description:
+            "Países e códigos ICAO.",
+        icon: Flag,
+        permission:
+            PERMISSIONS.countriesView
     },
     {
         href: "/configuration/visit-reasons",
         title: "Motivos",
-        description: "Motivos de viagem disponíveis.",
-        icon: Tags
+        description:
+            "Motivos de viagem disponíveis.",
+        icon: Tags,
+        permission:
+            PERMISSIONS.visitReasonsView
     },
     {
         href: "/configuration/taxes",
         title: "Taxas",
-        description: "Valores por pagamento e moeda.",
-        icon: CircleDollarSign
+        description:
+            "Valores por pagamento e moeda.",
+        icon: CircleDollarSign,
+        permission:
+            PERMISSIONS.taxesView
     },
     {
         href: "/configuration/settings",
         title: "Definições",
-        description: "Parâmetros globais do sistema.",
-        icon: Settings2
+        description:
+            "Parâmetros globais do sistema.",
+        icon: Settings2,
+        permission:
+            PERMISSIONS.settingsView
     }
-];
+] as const;
 
-export default function ConfigurationPage() {
+export default async function ConfigurationPage() {
+    const user =
+        await requireUser();
+
+    const visibleModules =
+        modules.filter(
+            function(module) {
+                return hasPermission(
+                    user,
+                    module.permission
+                );
+            }
+        );
+
+    if (
+        visibleModules.length === 0
+    ) {
+        return (
+            <AccessDenied
+                message="Não tem permissão para consultar os módulos de configuração."
+            />
+        );
+    }
+
     return (
         <main className="page">
             <div className="page-header">
                 <div>
-                    <h1>Configuração</h1>
+                    <h1>
+                        Configuração
+                    </h1>
+
                     <p>
-                        Administração dos dados de referência
-                        sincronizados com os dispositivos.
+                        Administração dos dados de referência sincronizados com os dispositivos.
                     </p>
                 </div>
             </div>
 
             <section className="grid config-module-grid">
-                {modules.map(function(module) {
-                    const Icon = module.icon;
+                {visibleModules.map(
+                    function(module) {
+                        const Icon =
+                            module.icon;
 
-                    return (
-                        <Link
-                            key={module.href}
-                            href={module.href}
-                            className="card config-module-card"
-                        >
-                            <div className="config-module-icon">
-                                <Icon size={24} />
-                            </div>
-                            <h2>{module.title}</h2>
-                            <p>{module.description}</p>
-                        </Link>
-                    );
-                })}
+                        return (
+                            <Link
+                                key={
+                                    module.href
+                                }
+                                href={
+                                    module.href
+                                }
+                                className="card config-module-card"
+                            >
+                                <div className="config-module-icon">
+                                    <Icon
+                                        size={24}
+                                    />
+                                </div>
+
+                                <h2>
+                                    {
+                                        module.title
+                                    }
+                                </h2>
+
+                                <p>
+                                    {
+                                        module.description
+                                    }
+                                </p>
+                            </Link>
+                        );
+                    }
+                )}
             </section>
         </main>
     );

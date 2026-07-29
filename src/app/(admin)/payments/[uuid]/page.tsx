@@ -1,1 +1,25 @@
-import{apiRequest}from"@/lib/api";import{getToken}from"@/lib/session";import{dateOnly,dateTime,money}from"@/lib/format";import type{Payment}from"@/types";export default async function Page({params}:{params:Promise<{uuid:string}>}){const{uuid}=await params,t=await getToken(),p=await apiRequest<Payment>(`/admin/payments/${uuid}`,{token:t||undefined});const rows=[["Recibo",p.receipt_no],["Passaporte",p.passport],["Nome",`${p.name} ${p.surname||""}`],["Nacionalidade",p.nationality||"—"],["Nascimento",dateOnly(p.birth_date)],["Ligação",`${p.flight_company||"—"} ${p.flight_code||""}`],["Entrada",dateOnly(p.checkin_date)],["Saída",dateOnly(p.checkout_date)],["Noites",String(p.nights)],["Ação",p.payment_action],["Pagamento",p.payment_type||"—"],["Valor",money(p.amount,p.currency)],["Posto",`${p.post_code} — ${p.post_name}`],["Dispositivo",p.device_name],["Operador",p.operator_name||"—"],["Criado",dateTime(p.local_created_at)],["Recebido",dateTime(p.received_at)],["Observação",p.obs||"—"]];return <main className="page"><div className="page-head"><h1>Detalhe do pagamento</h1><p className="muted">{p.receipt_no}</p></div><section className="card section detail-grid">{rows.map(([a,b])=><div key={a}><span className="muted">{a}</span><strong style={{display:"block",marginTop:6}}>{b}</strong></div>)}</section></main>}
+import { PermissionGate } from "@/components/PermissionGate";
+import { apiRequest } from "@/lib/api";
+import { getToken } from "@/lib/session";
+import { dateOnly, dateTime, money } from "@/lib/format";
+import { PERMISSIONS } from "@/lib/permissions";
+import type { Payment } from "@/types";
+
+export default async function Page({ params }: { params: Promise<{ uuid: string }> }) {
+    const { uuid } = await params;
+    const token = await getToken();
+    const payment = await apiRequest<Payment>(`/admin/payments/${uuid}`, { token: token || undefined });
+    const rows = [
+        ["Recibo", payment.receipt_no], ["Passaporte", payment.passport], ["Nome", `${payment.name} ${payment.surname || ""}`],
+        ["Nacionalidade", payment.nationality || "—"], ["Nascimento", dateOnly(payment.birth_date)], ["Ligação", `${payment.flight_company || "—"} ${payment.flight_code || ""}`],
+        ["Entrada", dateOnly(payment.checkin_date)], ["Saída", dateOnly(payment.checkout_date)], ["Noites", String(payment.nights)],
+        ["Ação", payment.payment_action], ["Pagamento", payment.payment_type || "—"], ["Valor", money(payment.amount, payment.currency)],
+        ["Posto", `${payment.post_code} — ${payment.post_name}`], ["Dispositivo", payment.device_name], ["Operador", payment.operator_name || "—"],
+        ["Criado", dateTime(payment.local_created_at)], ["Recebido", dateTime(payment.received_at)], ["Observação", payment.obs || "—"]
+    ];
+    return (
+        <PermissionGate permission={PERMISSIONS.recordsView}>
+            <main className="page"><div className="page-head"><h1>Detalhe do pagamento</h1><p className="muted">{payment.receipt_no}</p></div><section className="card section detail-grid">{rows.map(([label,content])=><div key={label}><span className="muted">{label}</span><strong style={{display:"block",marginTop:6}}>{content}</strong></div>)}</section></main>
+        </PermissionGate>
+    );
+}

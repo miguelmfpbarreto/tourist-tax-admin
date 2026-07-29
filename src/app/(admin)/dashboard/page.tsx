@@ -1,1 +1,102 @@
-import{apiRequest}from"@/lib/api";import{getToken}from"@/lib/session";import{money}from"@/lib/format";import type{Summary}from"@/types";export default async function Page(){const token=await getToken();const d=await apiRequest<Summary>("/admin/dashboard/summary",{token:token||undefined});const stats=[["Pagamentos",d.payments_today],["Recusas",d.refusals_today],["Isenções",d.exemptions_today],["Dispositivos online",d.devices_online]];return <main className="page"><div className="page-head"><h1>Dashboard</h1><p className="muted">Resumo operacional do dia.</p></div><section className="grid stats">{stats.map(([a,b])=><article className="card stat" key={a}><span className="muted">{a}</span><strong>{b}</strong></article>)}</section><section className="card section"><h2>Totais cobrados hoje</h2><div className="grid currency"><div><span className="muted">Dobras</span><h2>{money(d.dobra_total,"DOBRA")}</h2></div><div><span className="muted">Euros</span><h2>{money(d.euro_total,"EURO")}</h2></div><div><span className="muted">Dólares</span><h2>{money(d.dollar_total,"DOLAR")}</h2></div></div></section></main>}
+import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { apiRequest } from "@/lib/api";
+import { getToken } from "@/lib/session";
+import type {
+    DashboardData,
+    PaymentList,
+    PaymentReport,
+    Summary,
+    SyncOverview
+} from "@/types";
+
+function emptySummary(): Summary {
+    return {
+        payments_today: 0,
+        refusals_today: 0,
+        exemptions_today: 0,
+        dobra_total: "0",
+        euro_total: "0",
+        dollar_total: "0",
+        devices_online: 0,
+        devices_offline: 0
+    };
+}
+
+function reportStartDate(): string {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+
+    return date.toISOString().substring(0, 10);
+}
+
+export default async function DashboardPage() {
+    const token = await getToken();
+    const auth = {
+        token: token || undefined
+    };
+
+    const [
+        summaryResult,
+        paymentsResult,
+        reportResult,
+        synchronizationResult
+    ] = await Promise.allSettled([
+        apiRequest<Summary>(
+            "/admin/dashboard/summary",
+            auth
+        ),
+        apiRequest<PaymentList>(
+            "/admin/payments?page=1&limit=8",
+            auth
+        ),
+        apiRequest<PaymentReport>(
+            `/admin/reports/payments?date_from=${reportStartDate()}`,
+            auth
+        ),
+        apiRequest<SyncOverview>(
+            "/admin/synchronization/status",
+            auth
+        )
+    ]);
+
+    const data: DashboardData = {
+        generated_at:
+            new Date().toISOString(),
+        summary:
+            summaryResult.status ===
+            "fulfilled"
+                ? summaryResult.value
+                : emptySummary(),
+        recent_payments:
+            paymentsResult.status ===
+            "fulfilled"
+                ? paymentsResult.value.data
+                : [],
+        report:
+            reportResult.status ===
+            "fulfilled"
+                ? reportResult.value
+                : null,
+        synchronization:
+            synchronizationResult.status ===
+            "fulfilled"
+                ? synchronizationResult.value
+                : null
+    };
+
+    return (
+        <main className="page">
+            <div className="page-header">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p>
+                        Visão geral operacional,
+                        financeira e de sincronização.
+                    </p>
+                </div>
+            </div>
+
+            <DashboardClient data={data} />
+        </main>
+    );
+}

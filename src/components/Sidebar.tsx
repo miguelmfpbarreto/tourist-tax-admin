@@ -1,77 +1,89 @@
 import Link from "next/link";
-import {
-    BarChart3,
-    CreditCard,
-    FileBarChart,
-    Globe2,
-    MonitorCog,
-    Settings2,
-    ShieldCheck,
-    WalletCards
-} from "lucide-react";
+import Image from "next/image";
+import { BarChart3, FileBarChart, History, RefreshCcw, Settings2, ShieldCheck, WalletCards } from "lucide-react";
+import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
+import type { CurrentUser, SystemSettings } from "@/types";
+
+type SidebarProps = { system: SystemSettings; user: CurrentUser };
 
 const items = [
     {
         href: "/dashboard",
         label: "Dashboard",
-        icon: BarChart3
+        icon: BarChart3,
+        permissions: [
+            PERMISSIONS.dashboardView
+        ]
     },
     {
         href: "/charges",
         label: "Cobranças",
-        icon: WalletCards
+        icon: WalletCards,
+        permissions: [
+            PERMISSIONS.recordsView,
+            PERMISSIONS.paymentsView,
+            PERMISSIONS.refusalsView,
+            PERMISSIONS.exemptionsView
+        ]
     },
     {
         href: "/reports",
         label: "Relatórios",
-        icon: FileBarChart
+        icon: FileBarChart,
+        permissions: [
+            PERMISSIONS.reportsView,
+            PERMISSIONS.reportsGeneralView,
+            PERMISSIONS.reportsFinancialView,
+            PERMISSIONS.reportsOperationalView,
+            PERMISSIONS.reportsStatisticsView
+        ]
     },
     {
-        href: "/devices",
-        label: "Dispositivos",
-        icon: MonitorCog
+        href: "/synchronization",
+        label: "Sincronização",
+        icon: RefreshCcw,
+        permissions: [
+            PERMISSIONS.synchronizationView,
+            PERMISSIONS.syncDevicesView,
+            PERMISSIONS.syncLogsView,
+            PERMISSIONS.apiStatusView
+        ]
     },
     {
         href: "/administration",
         label: "Administração",
-        icon: ShieldCheck
+        icon: ShieldCheck,
+        permissions: [
+            PERMISSIONS.usersView,
+            PERMISSIONS.profilesView,
+            PERMISSIONS.permissionsView
+        ]
     },
     {
         href: "/configuration",
-        label: "Configuração",
-        icon: Settings2
+        label: "Configurações",
+        icon: Settings2,
+        permissions: [
+            PERMISSIONS.postsStatus,
+            PERMISSIONS.devicesView,
+            PERMISSIONS.flightsStatus,
+            PERMISSIONS.countriesView,
+            PERMISSIONS.visitReasonsCreate,
+            PERMISSIONS.taxesCreate,
+            PERMISSIONS.settingsView
+        ]
+    },
+    {
+        href: "/audit",
+        label: "Auditoria",
+        icon: History,
+        permissions: [
+            PERMISSIONS.auditView
+        ]
     }
-];
+] as const;
 
-export function Sidebar() {
-    return (
-        <aside className="sidebar">
-            <div className="brand">
-                <div className="brand-mark">
-                    <Globe2 size={23} />
-                </div>
-
-                <div>
-                    <strong>Tourist Tax</strong>
-                    <span>Administração central</span>
-                </div>
-            </div>
-
-            <nav className="nav">
-                {items.map(function(item) {
-                    const Icon = item.icon;
-
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                        >
-                            <Icon size={18} />
-                            {item.label}
-                        </Link>
-                    );
-                })}
-            </nav>
-        </aside>
-    );
+export function Sidebar({ system, user }: SidebarProps) {
+    const visibleItems = items.filter(item => hasAnyPermission(user, item.permissions));
+    return <aside className="sidebar"><div className="sidebar-brand"><Image src={system.logo || "/images/logo/turismo-sao-tome-principe.svg"} alt={system.country_name || "Turismo de São Tomé e Príncipe"} width={120} height={120} className="brand-logo" priority unoptimized/><h1>{system.institution_name}</h1></div><nav className="nav">{visibleItems.map(item=>{const Icon=item.icon;return <Link key={item.href} href={item.href}><Icon size={18}/>{item.label}</Link>})}</nav></aside>;
 }

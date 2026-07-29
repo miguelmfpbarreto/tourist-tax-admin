@@ -9,16 +9,20 @@ import {
     X
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { AccessDenied } from "@/components/AccessDenied";
+
 import type {
     ConfigEntityDefinition
 } from "@/lib/configEntities";
 import type {
     ConfigField,
-    ConfigRow
+    ConfigRow,
+    PostOption
 } from "@/types";
 
 type Props = {
     definition: ConfigEntityDefinition;
+    access: { canCreate: boolean; canUpdate: boolean; canStatus: boolean };
 };
 
 function displayValue(row: ConfigRow, key: string): string {
@@ -62,14 +66,20 @@ function initialForm(fields: ConfigField[]) {
 }
 
 export function ConfigCrud({
-    definition
+    definition,
+    access
 }: Props) {
     const [rows, setRows] = useState<ConfigRow[]>([]);
+    const [posts, setPosts] = useState<PostOption[]>([]);
+    const [loadingPosts, setLoadingPosts] = useState(false);
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+
+    const [accessDenied, setAccessDenied] =
+        useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] =
         useState<ConfigRow | null>(null);
@@ -97,6 +107,11 @@ export function ConfigCrud({
 
             const result = await response.json();
 
+            if (response.status === 401 || response.status === 403) {
+                setAccessDenied(result.message || "Acesso negado.");
+                return;
+            }
+
             if (!response.ok || !result.success) {
                 setError(
                     result.message ||
@@ -118,9 +133,99 @@ export function ConfigCrud({
         }
     }, [definition.entity, search]);
 
-    useEffect(function() {
-        loadRows();
-    }, [loadRows]);
+    const loadPosts =
+    useCallback(
+        async function() {
+            /*
+             * Os postos só são necessários
+             * no formulário de Ligações.
+             */
+            if (
+                definition.entity !==
+                "flights"
+            ) {
+                setPosts([]);
+                return;
+            }
+
+            setLoadingPosts(true);
+
+            try {
+                const response =
+                    await fetch(
+                        "/api/config/posts",
+                        {
+                            cache:
+                                "no-store"
+                        }
+                    );
+
+                const result =
+                    await response.json();
+
+                if (
+                    !response.ok ||
+                    !result.success
+                ) {
+                    throw new Error(
+                        result.message ||
+                        "Não foi possível carregar os postos."
+                    );
+                }
+
+                const payload =
+                    result.data;
+
+                const postRows =
+                    Array.isArray(payload)
+                        ? payload
+                        : Array.isArray(
+                            payload &&
+                            payload.data
+                        )
+                            ? payload.data
+                            : [];
+
+                setPosts(
+                    postRows.filter(
+                        function(post) {
+                            return (
+                                post.is_active ===
+                                true
+                            );
+                        }
+                    )
+                );
+            } catch (loadError) {
+                console.error(
+                    "Erro ao carregar postos:",
+                    loadError
+                );
+
+                setPosts([]);
+
+                setError(
+                    loadError instanceof Error
+                        ? loadError.message
+                        : "Não foi possível carregar os postos."
+                );
+            } finally {
+                setLoadingPosts(false);
+            }
+        },
+        [definition.entity]
+    );
+
+    useEffect(
+        function() {
+            loadRows();
+            loadPosts();
+        },
+        [
+            loadRows,
+            loadPosts
+        ]
+    );
 
     function openCreate() {
         setEditing(null);
@@ -145,35 +250,44 @@ export function ConfigCrud({
     }
 
     function updateField(
-        field: ConfigField,
-        event: React.ChangeEvent<
-            HTMLInputElement |
-            HTMLSelectElement |
-            HTMLTextAreaElement
-        >
+    field: ConfigField,
+    event: React.ChangeEvent<
+        HTMLInputElement |
+        HTMLSelectElement |
+        HTMLTextAreaElement
+    >
+) {
+    const target = event.target;
+    let value: unknown = target.value;
+
+    if (
+        field.type === "boolean" &&
+        target instanceof HTMLInputElement
     ) {
-        const target = event.target;
-        let value: unknown = target.value;
-
-        if (
-            field.type === "boolean" &&
-            target instanceof HTMLInputElement
-        ) {
-            value = target.checked;
-        } else if (field.type === "number") {
-            value =
-                target.value === ""
-                    ? ""
-                    : Number(target.value);
-        }
-
-        setForm(function(current) {
-            return {
-                ...current,
-                [field.name]: value
-            };
-        });
+        value = target.checked;
+    } else if (
+        field.type === "number"
+    ) {
+        value =
+            target.value === ""
+                ? ""
+                : Number(target.value);
+    } else if (
+        field.type === "text"
+    ) {
+        value =
+            target.value.toLocaleUpperCase(
+                "pt-PT"
+            );
     }
+
+    setForm(function(current) {
+        return {
+            ...current,
+            [field.name]: value
+        };
+    });
+}
 
     async function save(
         event: React.FormEvent<HTMLFormElement>
@@ -188,15 +302,45 @@ export function ConfigCrud({
                 ? `/api/config/${definition.entity}/${editing.uuid}`
                 : `/api/config/${definition.entity}`;
 
+            const payload =
+                Object.fromEntries(
+                    Object.entries(form).map(
+                        function([key, value]) {
+                            if (
+                                typeof value === "string"
+                            ) {
+                                return [
+                                    key,
+                                    value
+                                        .trim()
+                                        .toLocaleUpperCase(
+                                            "pt-PT"
+                                        )
+                                ];
+                            }
+
+                            return [
+                                key,
+                                value
+                            ];
+                        }
+                    )
+                );
+
             const response = await fetch(url, {
                 method: editing ? "PATCH" : "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(form)
+                body: JSON.stringify(payload)
             });
 
             const result = await response.json();
+
+            if (response.status === 401 || response.status === 403) {
+                setAccessDenied(result.message || "Acesso negado.");
+                return;
+            }
 
             if (!response.ok || !result.success) {
                 setError(
@@ -249,7 +393,12 @@ export function ConfigCrud({
 
         const result = await response.json();
 
-        if (!response.ok || !result.success) {
+        if (response.status === 401 || response.status === 403) {
+                setAccessDenied(result.message || "Acesso negado.");
+                return;
+            }
+
+            if (!response.ok || !result.success) {
             setError(
                 result.message ||
                     "Não foi possível alterar o estado."
@@ -258,6 +407,10 @@ export function ConfigCrud({
         }
 
         await loadRows();
+    }
+
+    if (accessDenied) {
+        return <AccessDenied message={accessDenied} />;
     }
 
     return (
@@ -286,14 +439,11 @@ export function ConfigCrud({
                     </button>
                 </form>
 
-                <button
-                    className="btn"
-                    type="button"
-                    onClick={openCreate}
-                >
-                    <Plus size={17} />
-                    Novo
-                </button>
+                {access.canCreate ? (
+                    <button className="btn" type="button" onClick={openCreate}>
+                        <Plus size={17} /> Novo
+                    </button>
+                ) : null}
             </section>
 
             {error ? (
@@ -360,19 +510,13 @@ export function ConfigCrud({
                                             )}
                                             <td>
                                                 <div className="config-row-actions">
-                                                    <button
-                                                        className="icon-btn"
-                                                        type="button"
-                                                        title="Editar"
-                                                        onClick={function() {
-                                                            openEdit(row);
-                                                        }}
-                                                    >
-                                                        <Edit3 size={16} />
-                                                    </button>
+                                                    {access.canUpdate ? (
+                                                        <button className="icon-btn" type="button" title="Editar" onClick={function() { openEdit(row); }}>
+                                                            <Edit3 size={16} />
+                                                        </button>
+                                                    ) : null}
 
-                                                    {definition.entity !==
-                                                    "settings" ? (
+                                                    {definition.entity !== "settings" && access.canStatus ? (
                                                         <button
                                                             className={`icon-btn ${
                                                                 row.is_active
@@ -441,6 +585,26 @@ export function ConfigCrud({
                                     function(field) {
                                         const value =
                                             form[field.name];
+
+                                        const selectOptions =
+                                            field.name === "post_id" &&
+                                            definition.entity === "flights"
+                                                ? posts.map(
+                                                    function(post) {
+                                                        return {
+                                                            value:
+                                                                String(
+                                                                    post.id
+                                                                ),
+
+                                                            label:
+                                                                post.code +
+                                                                " - " +
+                                                                post.name
+                                                        };
+                                                    }
+                                                )
+                                                : field.options || [];
 
                                         if (field.type === "boolean") {
                                             return (
@@ -512,11 +676,21 @@ export function ConfigCrud({
                                                         required={
                                                             field.required
                                                         }
+                                                        disabled={
+                                                            field.name ===
+                                                                "post_id" &&
+                                                            loadingPosts
+                                                        }
                                                     >
                                                         <option value="">
-                                                            Selecione
+                                                            {field.name === "post_id"
+                                                                ? loadingPosts
+                                                                    ? "A CARREGAR POSTOS..."
+                                                                    : "SELECIONE O POSTO"
+                                                                : "SELECIONE"}
                                                         </option>
-                                                        {field.options?.map(
+
+                                                        {selectOptions.map(
                                                             function(option) {
                                                                 return (
                                                                     <option

@@ -20,38 +20,61 @@ export const configEntities: Record<
     ConfigEntityDefinition
 > = {
     posts: {
-        entity: "posts",
-        title: "Postos",
-        singular: "Posto",
-        description:
-            "Gestão dos postos de entrada e cobrança.",
-        columns: [
-            { key: "code", label: "Código" },
-            { key: "name", label: "Nome" },
-            { key: "location", label: "Localização" },
-            { key: "is_active", label: "Estado" }
-        ],
-        fields: [
-            {
-                name: "code",
-                label: "Código",
-                type: "text",
-                required: true,
-                placeholder: "AIR001"
-            },
-            {
-                name: "name",
-                label: "Nome",
-                type: "text",
-                required: true
-            },
-            {
-                name: "location",
-                label: "Localização",
-                type: "text"
-            }
-        ]
-    },
+    entity: "posts",
+    title: "Postos",
+    singular: "Posto",
+    description:
+        "Gestão dos postos de entrada e cobrança.",
+    columns: [
+        {
+            key: "code",
+            label: "Código"
+        },
+        {
+            key: "name",
+            label: "Nome"
+        },
+        {
+            key: "location",
+            label: "Localização"
+        },
+        {
+            key: "is_active",
+            label: "Estado"
+        }
+    ],
+    fields: [
+        {
+            name: "code",
+            label: "Código",
+            type: "text",
+            required: true,
+            placeholder: "AIR001"
+        },
+        {
+            name: "name",
+            label: "Nome",
+            type: "text",
+            required: true
+        },
+        {
+            name: "location",
+            label: "Localização",
+            type: "select",
+            required: true,
+            options: [
+                {
+                    value: "SÃO TOMÉ",
+                    label: "SÃO TOMÉ"
+                },
+                {
+                    value: "PRÍNCIPE",
+                    label: "PRÍNCIPE"
+                }
+            ]
+        }
+    ]
+},
     flights: {
         entity: "flights",
         title: "Ligações",
@@ -68,27 +91,31 @@ export const configEntities: Record<
         fields: [
             {
                 name: "post_id",
-                label: "ID do posto",
-                type: "number",
-                required: true
+                label: "Posto",
+                type: "select",
+                required: true,
+                options: []
             },
             {
                 name: "code",
                 label: "Código",
                 type: "text",
-                required: true
+                required: true,
+                placeholder: "Ex.: TP123, DT510, CRZ001"
             },
             {
                 name: "origin",
                 label: "Proveniência",
                 type: "text",
-                required: true
+                required: true,
+                placeholder: "Ex.: LISBOA, LUANDA, MALABO"
             },
             {
                 name: "company",
                 label: "Companhia",
                 type: "text",
-                required: true
+                required: true,
+                placeholder: "Ex.: TAP, TAG, ASKY"
             }
         ]
     },

@@ -1,10 +1,12 @@
 import { ConfigPage } from "@/components/config/ConfigPage";
+import { PermissionGate } from "@/components/PermissionGate";
 import { configEntities } from "@/lib/configEntities";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function Page() {
     return (
-        <ConfigPage
-            definition={configEntities["flights"]}
-        />
+        <PermissionGate permission={PERMISSIONS.flightsView}>
+            <ConfigPage definition={configEntities["flights"]} />
+        </PermissionGate>
     );
 }
