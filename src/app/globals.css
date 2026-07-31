@@ -2803,3 +2803,124 @@ a {
     color: #94a3b8;
     line-height: 1.6;
 }
+/* Login institucional */
+.login-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 32px 16px;
+    background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, .16), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(34, 197, 94, .10), transparent 30%),
+        var(--bg);
+}
+
+.login-card {
+    width: min(520px, 100%);
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .35);
+}
+
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.login-logo-wrap {
+    width: 84px;
+    height: 84px;
+    flex: 0 0 84px;
+    display: grid;
+    place-items: center;
+}
+
+.login-logo {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+.login-identity {
+    min-width: 0;
+}
+
+.login-country,
+.login-system-name,
+.login-brand h1,
+.login-form-head h2 {
+    margin: 0;
+}
+
+.login-country {
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.login-brand h1 {
+    color: var(--text);
+    font-size: clamp(20px, 4vw, 27px);
+    line-height: 1.2;
+}
+
+.login-system-name {
+    margin-top: 7px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.login-divider {
+    height: 1px;
+    margin: 24px 0;
+    background: var(--border);
+}
+
+.login-form-head {
+    margin-bottom: 20px;
+}
+
+.login-form-head h2 {
+    margin-bottom: 7px;
+    font-size: 21px;
+}
+
+.login-form-head p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.login-card .input,
+.login-card .btn {
+    width: 100%;
+}
+
+@media (max-width: 560px) {
+    .login-page {
+        place-items: start center;
+        padding: 18px 14px;
+    }
+
+    .login-card {
+        padding: 24px 20px;
+        border-radius: 17px;
+    }
+
+    .login-brand {
+        align-items: flex-start;
+    }
+
+    .login-logo-wrap {
+        width: 64px;
+        height: 64px;
+        flex-basis: 64px;
+    }
+}
