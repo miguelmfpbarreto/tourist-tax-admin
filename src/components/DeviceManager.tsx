@@ -64,6 +64,14 @@ type DeviceForm = {
     is_active: boolean;
 };
 
+type DeviceManagerProps = {
+    access: {
+        canCreate: boolean;
+        canUpdate: boolean;
+        canStatus: boolean;
+    };
+};
+
 const emptyForm: DeviceForm = {
     device_name: "",
     post_uuid: "",
@@ -134,7 +142,9 @@ function getConnectionBadgeClass(
     return "warning";
 }
 
-export function DeviceManager() {
+export function DeviceManager({
+    access
+}: DeviceManagerProps) {
     const [devices, setDevices] =
         useState<Device[]>([]);
 

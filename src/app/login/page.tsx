@@ -25,9 +25,16 @@ export default async function Page() {
         system.system_name ||
         "Sistema Nacional de Gestão da Taxa Turística";
 
-    const logo =
-        system.logo?.trim() ||
-        "/images/logo/turismo-sao-tome-principe.svg";
+    const configuredLogo = system.logo?.trim() || "";
+    const logo = configuredLogo
+        ? (
+            configuredLogo.startsWith("/") ||
+            configuredLogo.startsWith("http://") ||
+            configuredLogo.startsWith("https://")
+                ? configuredLogo
+                : `/${configuredLogo}`
+        )
+        : "/images/logo/turismo-sao-tome-principe.svg";
 
     return (
         <main className="login-page">

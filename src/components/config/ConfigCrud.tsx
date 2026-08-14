@@ -176,14 +176,14 @@ export function ConfigCrud({
                 const payload =
                     result.data;
 
-                const postRows =
+                const postRows: PostOption[] =
                     Array.isArray(payload)
-                        ? payload
+                        ? payload as PostOption[]
                         : Array.isArray(
                             payload &&
                             payload.data
                         )
-                            ? payload.data
+                            ? payload.data as PostOption[]
                             : [];
 
                 setPosts(
@@ -298,8 +298,19 @@ export function ConfigCrud({
         setMessage("");
 
         try {
-            const url = editing && editing.uuid
-                ? `/api/config/${definition.entity}/${editing.uuid}`
+            const editingIdentifier = editing
+                ? (
+                    editing.uuid ||
+                    (
+                        definition.entity === "settings"
+                            ? String(editing.setting_key || "")
+                            : ""
+                    )
+                )
+                : "";
+
+            const url = editing && editingIdentifier
+                ? `/api/config/${definition.entity}/${encodeURIComponent(editingIdentifier)}`
                 : `/api/config/${definition.entity}`;
 
             const payload =
@@ -309,6 +320,15 @@ export function ConfigCrud({
                             if (
                                 typeof value === "string"
                             ) {
+                                if (definition.entity === "settings") {
+                                    return [
+                                        key,
+                                        key === "setting_key"
+                                            ? value.trim().toLocaleLowerCase("pt-PT")
+                                            : value.trim()
+                                    ];
+                                }
+
                                 return [
                                     key,
                                     value

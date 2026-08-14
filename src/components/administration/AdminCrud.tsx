@@ -31,7 +31,7 @@ import type {
 function value(
     row: AdminRow,
     key: string
-) {
+): string | number {
     if (key === "is_active") {
         return row.is_active
             ? "ATIVO"
@@ -49,7 +49,7 @@ function value(
             row.permission_ids
         )
             ? row.permission_ids.length
-            : row.permissions_count || 0;
+            : Number(row.permissions_count || 0);
     }
 
     return String(
@@ -450,14 +450,14 @@ const [loadingProfiles, setLoadingProfiles] =
                 const payload =
                     result.data;
 
-                const rows =
+                const rows: ProfileOption[] =
                     Array.isArray(payload)
-                        ? payload
+                        ? payload as ProfileOption[]
                         : Array.isArray(
                             payload &&
                             payload.data
                         )
-                            ? payload.data
+                            ? payload.data as ProfileOption[]
                             : [];
 
                 setProfiles(
