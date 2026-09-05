@@ -50,17 +50,12 @@ type ApiEnvelope<T> = {
     data?: T;
 };
 
-async function loadSystem(): Promise<SystemSettings | null> {
-    try {
-        const response = await fetch(
-            `${env.apiUrl}/admin/settings/system`,
-            { cache: "no-store" }
-        );
-        const payload = await response.json();
-        return response.ok && payload.success ? payload.data : null;
-    } catch {
-        return null;
-    }
+function loadSystem(): SystemSettings {
+    return {
+        country_name: "República Democrática de São Tomé e Príncipe",
+        institution_name: "Direção Geral do Turismo e Hotelaria",
+        system_name: "Sistema Nacional de Gestão da Taxa Turística"
+    } as SystemSettings;
 }
 
 async function verifyReceipt(
@@ -111,10 +106,8 @@ export default async function Page({
     }>;
 }) {
     const { receipt, uuid } = await params;
-    const [verification, system] = await Promise.all([
-        verifyReceipt(receipt, uuid),
-        loadSystem()
-    ]);
+    const verification = await verifyReceipt(receipt, uuid);
+    const system = loadSystem();
 
     const countryName =
         system?.country_name ||
