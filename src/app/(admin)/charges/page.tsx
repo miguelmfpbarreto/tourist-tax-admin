@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Ban, CreditCard, ShieldCheck } from "lucide-react";
+import { Ban, BadgeCheck, CreditCard, ShieldCheck } from "lucide-react";
 import { AccessDenied } from "@/components/AccessDenied";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
@@ -42,6 +42,16 @@ const modules = [
             "Todas as cobranças registadas.",
         icon: CreditCard,
         className: "success",
+        permission:
+            PERMISSIONS.recordsView
+    },
+    {
+        href: "/payments?verification_status=verified",
+        title: "Recibos verificados",
+        description:
+            "Recibos já utilizados e confirmados no controlo de saída.",
+        icon: BadgeCheck,
+        className: "verified",
         permission:
             PERMISSIONS.recordsView
     }

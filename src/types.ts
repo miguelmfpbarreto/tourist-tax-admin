@@ -53,6 +53,13 @@ export type Payment = {
     obs: string | null;
     local_created_at: string;
     received_at: string;
+    exit_finalized: boolean;
+    exit_date: string | null;
+    exit_finalized_at: string | null;
+    exit_device_name: string | null;
+    exit_post_code: string | null;
+    exit_post_name: string | null;
+    exit_operator_name: string | null;
 };
 
 export type PaymentList = {

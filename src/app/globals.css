@@ -1094,6 +1094,99 @@ a {
     background: rgba(245, 158, 11, .16);
 }
 
+.charges-module-icon.verified {
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, .14);
+}
+
+.payment-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.payment-detail-head .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-detail-section {
+    margin-top: 18px;
+    padding: 24px;
+}
+
+.payment-detail-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.payment-detail-title h2,
+.payment-detail-title p {
+    margin: 0;
+}
+
+.payment-detail-title p {
+    margin-top: 5px;
+    color: var(--muted);
+}
+
+.payment-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.payment-detail-grid > div {
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(10, 15, 34, .35);
+}
+
+.payment-detail-grid strong {
+    display: block;
+    margin-top: 6px;
+    overflow-wrap: anywhere;
+}
+
+.verification-card.verified {
+    border-color: rgba(16, 185, 129, .45);
+}
+
+.verification-card.pending {
+    border-color: rgba(245, 158, 11, .35);
+}
+
+.verification-title-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    border-radius: 12px;
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, .14);
+}
+
+.verification-card.pending .verification-title-icon {
+    color: #fbbf24;
+    background: rgba(245, 158, 11, .12);
+}
+
+@media (max-width: 900px) {
+    .payment-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+    .payment-detail-head { align-items: flex-start; }
+    .payment-detail-grid { grid-template-columns: 1fr; }
+}
+
 .charges-module-card h2 {
     margin: 18px 0 7px;
 }

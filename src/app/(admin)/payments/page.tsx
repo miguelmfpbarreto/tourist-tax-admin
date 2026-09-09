@@ -41,6 +41,23 @@ export default async function Page({
     const params =
         await searchParams;
 
+    const verificationStatus =
+        params.verification_status || "";
+
+    const pageTitle =
+        verificationStatus === "verified"
+            ? "Recibos verificados"
+            : verificationStatus === "unverified"
+              ? "Recibos não verificados"
+              : "Todos os registos";
+
+    const pageDescription =
+        verificationStatus === "verified"
+            ? "Recibos já confirmados e utilizados no controlo de saída."
+            : verificationStatus === "unverified"
+              ? "Recibos que ainda não foram utilizados no controlo de saída."
+              : "Pesquisa e consulta de todas as cobranças, recusas e isenções.";
+
     const token =
         await getToken();
 
@@ -53,6 +70,7 @@ export default async function Page({
         "currency",
         "date_from",
         "date_to",
+        "verification_status",
         "page"
     ].forEach(
         function(key) {
@@ -138,11 +156,11 @@ export default async function Page({
         <main className="page">
             <div className="page-head">
                 <h1>
-                    Pagamentos
+                    {pageTitle}
                 </h1>
 
                 <p className="muted">
-                    Pesquisa e consulta dos registos.
+                    {pageDescription}
                 </p>
             </div>
 
@@ -183,6 +201,10 @@ export default async function Page({
 
                                 <th>
                                     Dispositivo
+                                </th>
+
+                                <th>
+                                    Verificação
                                 </th>
                             </tr>
                         </thead>
@@ -263,6 +285,12 @@ export default async function Page({
                                                 {
                                                     payment.device_name
                                                 }
+                                            </td>
+
+                                            <td>
+                                                <span className={`badge ${payment.exit_finalized ? "success" : ""}`}>
+                                                    {payment.exit_finalized ? "VERIFICADO" : "NÃO VERIFICADO"}
+                                                </span>
                                             </td>
                                         </tr>
                                     );

@@ -177,10 +177,11 @@ export const configEntities: Record<
         title: "Taxas",
         singular: "Taxa",
         description:
-            "Valores por forma de pagamento e moeda.",
+            "Valores por forma de pagamento, moeda e localização.",
         columns: [
             { key: "payment_type", label: "Pagamento" },
             { key: "currency", label: "Moeda" },
+            { key: "location", label: "Localização" },
             { key: "amount", label: "Valor" },
             { key: "is_active", label: "Estado" }
         ],
@@ -199,7 +200,19 @@ export const configEntities: Record<
                 options: [
                     { value: "DOBRA", label: "Dobra" },
                     { value: "EURO", label: "Euro" },
-                    { value: "DOLAR", label: "Dólar" }
+                    { value: "DOLAR", label: "Dólar" },
+                    { value: "ISENTO", label: "Isento" }
+                ]
+            },
+            {
+                name: "location",
+                label: "Localização",
+                type: "select",
+                required: true,
+                options: [
+                    { value: "GLOBAL", label: "Global — todas as localizações" },
+                    { value: "SÃO TOMÉ", label: "São Tomé" },
+                    { value: "PRÍNCIPE", label: "Príncipe" }
                 ]
             },
             {
